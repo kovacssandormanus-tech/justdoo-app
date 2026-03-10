@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, isNull, lt, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, projects, tasks } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -90,3 +90,54 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // TODO: add feature queries here as your schema grows.
+
+export async function getUserTasks(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(tasks).where(eq(tasks.userId, userId));
+}
+
+export async function getUserProjects(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(projects).where(eq(projects.userId, userId));
+}
+
+export async function getTasksByView(userId: number, view: 'inbox' | 'today' | 'next10days' | 'someday') {
+  const db = await getDb();
+  if (!db) return [];
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const next10Days = new Date(today);
+  next10Days.setDate(next10Days.getDate() + 10);
+
+  switch (view) {
+    case 'inbox':
+      return db.select().from(tasks).where(
+        and(eq(tasks.userId, userId), isNull(tasks.dueDate))
+      );
+    case 'today':
+      return db.select().from(tasks).where(
+        and(
+          eq(tasks.userId, userId),
+          gte(tasks.dueDate, today),
+          lt(tasks.dueDate, tomorrow)
+        )
+      );
+    case 'next10days':
+      return db.select().from(tasks).where(
+        and(
+          eq(tasks.userId, userId),
+          gte(tasks.dueDate, tomorrow),
+          lte(tasks.dueDate, next10Days)
+        )
+      );
+    case 'someday':
+      return db.select().from(tasks).where(
+        and(eq(tasks.userId, userId), isNull(tasks.dueDate))
+      );
+  }
+}
