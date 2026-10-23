@@ -1,4 +1,5 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { ENERGIASZINTEK, LISTAK, PROJEKT_ALLAPOTOK } from "../shared/gtd";
 
 /**
  * Core user table backing auth flow.
@@ -20,6 +21,8 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  /** A legutóbbi GTD heti áttekintés időpontja. */
+  utolsoAttekintes: timestamp("utolsoAttekintes"),
 });
 
 export type User = typeof users.$inferSelect;
@@ -30,6 +33,9 @@ export const projects = mysqlTable("projects", {
   userId: int("userId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   color: varchar("color", { length: 7 }).default("#3b82f6").notNull(),
+  /** GTD: a kívánt végeredmény ("mikor van kész?"). */
+  cel: text("cel"),
+  allapot: mysqlEnum("allapot", PROJEKT_ALLAPOTOK).default("aktiv").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -45,6 +51,14 @@ export const tasks = mysqlTable("tasks", {
   description: text("description"),
   dueDate: timestamp("dueDate"),
   status: mysqlEnum("status", ["pending", "completed"]).default("pending").notNull(),
+  lista: mysqlEnum("lista", LISTAK).default("kovetkezo").notNull(),
+  kontextus: varchar("kontextus", { length: 32 }),
+  /** Becsült időigény percben. */
+  idoigeny: int("idoigeny"),
+  energia: mysqlEnum("energia", ENERGIASZINTEK),
+  /** Várakozás listánál: kitől várunk. */
+  varakozasKire: varchar("varakozasKire", { length: 255 }),
+  befejezve: timestamp("befejezve"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

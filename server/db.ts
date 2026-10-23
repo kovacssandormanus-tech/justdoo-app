@@ -1,7 +1,8 @@
-import { and, eq, gte, isNull, lt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, lte, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, projects, tasks } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import type { Nezet } from "../shared/gtd";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -103,41 +104,90 @@ export async function getUserProjects(userId: number) {
   return db.select().from(projects).where(eq(projects.userId, userId));
 }
 
-export async function getTasksByView(userId: number, view: 'inbox' | 'today' | 'next10days' | 'someday') {
+function napKezdete(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** Függőben lévő feladatok, plusz a ma befejezettek (hogy a pipálás látható maradjon). */
+function aktivVagyMaKesz(today: Date) {
+  return or(eq(tasks.status, "pending"), gte(tasks.befejezve, today));
+}
+
+export async function getTasksByView(userId: number, view: Nezet, now: Date = new Date()) {
   const db = await getDb();
   if (!db) return [];
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const today = napKezdete(now);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const next10Days = new Date(today);
   next10Days.setDate(next10Days.getDate() + 10);
 
+  const sajat = eq(tasks.userId, userId);
+
   switch (view) {
-    case 'inbox':
-      return db.select().from(tasks).where(
-        and(eq(tasks.userId, userId), isNull(tasks.dueDate))
-      );
-    case 'today':
-      return db.select().from(tasks).where(
-        and(
-          eq(tasks.userId, userId),
-          gte(tasks.dueDate, today),
-          lt(tasks.dueDate, tomorrow)
+    case "next":
+      return db
+        .select()
+        .from(tasks)
+        .where(and(sajat, eq(tasks.lista, "kovetkezo"), aktivVagyMaKesz(today)))
+        .orderBy(asc(tasks.createdAt));
+    case "today":
+      // GTD "kemény tájkép": a mai és a lejárt, még nyitott határidős tételek.
+      return db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            sajat,
+            ne(tasks.lista, "referencia"),
+            lt(tasks.dueDate, tomorrow),
+            aktivVagyMaKesz(today)
+          )
         )
-      );
-    case 'next10days':
-      return db.select().from(tasks).where(
-        and(
-          eq(tasks.userId, userId),
-          gte(tasks.dueDate, tomorrow),
-          lte(tasks.dueDate, next10Days)
+        .orderBy(asc(tasks.dueDate));
+    case "next10days":
+      return db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            sajat,
+            ne(tasks.lista, "referencia"),
+            gte(tasks.dueDate, tomorrow),
+            lte(tasks.dueDate, next10Days),
+            aktivVagyMaKesz(today)
+          )
         )
-      );
-    case 'someday':
-      return db.select().from(tasks).where(
-        and(eq(tasks.userId, userId), isNull(tasks.dueDate))
-      );
+        .orderBy(asc(tasks.dueDate));
+    case "waiting":
+      return db
+        .select()
+        .from(tasks)
+        .where(and(sajat, eq(tasks.lista, "varakozas"), aktivVagyMaKesz(today)))
+        .orderBy(asc(tasks.createdAt));
+    case "someday":
+      return db
+        .select()
+        .from(tasks)
+        .where(and(sajat, eq(tasks.lista, "majd_egyszer"), aktivVagyMaKesz(today)))
+        .orderBy(desc(tasks.createdAt));
+    case "reference":
+      return db
+        .select()
+        .from(tasks)
+        .where(and(sajat, eq(tasks.lista, "referencia")))
+        .orderBy(desc(tasks.createdAt));
   }
+}
+
+export async function getUserTaskById(userId: number, taskId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [task] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+    .limit(1);
+  return task;
 }

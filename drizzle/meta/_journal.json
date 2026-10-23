@@ -15,6 +15,13 @@
       "when": 1773173959891,
       "tag": "0001_wide_violations",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1792793062549,
+      "tag": "0002_brave_norman_osborn",
+      "breakpoints": true
     }
   ]
 }
