@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import TaskDashboardLayout from "@/components/TaskDashboardLayout";
 import TaskListView from "@/components/TaskListView";
+import GyujtoPanel from "@/components/GyujtoPanel";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 
@@ -24,6 +25,7 @@ export default function InboxPage() {
 
   return (
     <TaskDashboardLayout currentView="inbox">
+      <GyujtoPanel />
       <TaskListView view="inbox" />
     </TaskDashboardLayout>
   );

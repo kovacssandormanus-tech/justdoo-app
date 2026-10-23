@@ -51,3 +51,21 @@ export const tasks = mysqlTable("tasks", {
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = typeof tasks.$inferInsert;
+
+/**
+ * Gyűjtőelemek: a GTD "gyűjtés" lépésében rögzített, még fel nem dolgozott tételek.
+ * Az AI ezekből kérdez és sorol be teendőt, projektet vagy elvetést.
+ */
+export const gyujtoelemek = mysqlTable("gyujtoelemek", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  szoveg: text("szoveg").notNull(),
+  kontextus: text("kontextus"),
+  kerdes: text("kerdes"),
+  allapot: mysqlEnum("allapot", ["uj", "veglegesitve"]).default("uj").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Gyujtoelem = typeof gyujtoelemek.$inferSelect;
+export type InsertGyujtoelem = typeof gyujtoelemek.$inferInsert;
