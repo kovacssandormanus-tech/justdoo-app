@@ -131,7 +131,7 @@ export default function TaskListView({ view }: TaskListViewProps) {
               setEditingId(null);
               resetForm();
             }}
-            className="gap-2 bg-green-600 text-white hover:bg-green-700"
+            className="gap-2"
           >
             <Plus className="w-4 h-4" />
             New Task
