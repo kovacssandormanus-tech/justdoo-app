@@ -68,11 +68,11 @@ describe("tasks procedures", () => {
   });
 
   describe("tasks.listByView", () => {
-    it("lists inbox tasks (unscheduled)", async () => {
+    it("lists next actions", async () => {
       const ctx = createAuthContext();
       const caller = appRouter.createCaller(ctx);
 
-      const result = await caller.tasks.listByView("inbox");
+      const result = await caller.tasks.listByView("next");
 
       expect(Array.isArray(result)).toBe(true);
     });

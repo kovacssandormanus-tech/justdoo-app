@@ -4,12 +4,21 @@ An elegant, focused task management application built with React, TypeScript, an
 
 ## Features
 
-### Four Task Views
+JustDoo follows David Allen's **Getting Things Done (GTD)** method, with an AI assistant helping at every step.
 
-- **Inbox** - Capture unscheduled tasks without worrying about dates
-- **Mai feladatok (Today)** - Focus on what needs to be done today
-- **Következő 10 nap (Next 10 days)** - Plan ahead with upcoming tasks
-- **Valamikor talán (Someday/Maybe)** - Keep track of ideas for the future
+### GTD views
+
+- **Gyűjtő (Inbox)** – capture anything; the AI processes each item with the GTD questions (actionable? next action? 2 minutes? project? delegate? date?) and fills in context, time and energy
+- **Következő lépések (Next actions)** – filter by context (@gép, @telefon, @otthon, @iroda, @úton); **"Mit csináljak most?"** asks the AI to pick the best 3 actions for your current context, time and energy
+- **Mai feladatok / Következő 10 nap** – the calendar ("hard landscape"), including overdue items
+- **Várakozás (Waiting for)** – delegated items and who you are waiting on
+- **Projektek** – desired outcome, status (aktív / valamikor talán / kész), stalled-project warning, **"AI: következő lépés"**
+- **Valamikor talán (Someday/Maybe)** and **Referencia**
+- **Heti áttekintés (Weekly review)** – Get Clear / Get Current / Get Creative checklist with an AI summary and one-click next actions for stalled projects
+
+### Database migration
+
+`drizzle/0002_brave_norman_osborn.sql` adds the GTD columns (`tasks.lista`, `kontextus`, `idoigeny`, `energia`, `varakozasKire`, `befejezve`, `projects.cel`, `projects.allapot`, `users.utolsoAttekintes`) and the `gyujtoelemek` table. Apply it with `pnpm db:push` (or run the SQL manually) before deploying.
 
 ### Project Management
 

@@ -5,15 +5,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Inbox, Calendar, Clock, Star, Plus, LogOut } from "lucide-react";
+import { Inbox, Calendar, Clock, Star, Plus, LogOut, ListChecks, Hourglass, FolderKanban, BookOpen, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 interface TaskDashboardLayoutProps {
   children: React.ReactNode;
-  currentView: 'inbox' | 'today' | 'next10days' | 'someday';
+  currentView: GtdView;
 }
+
+export type GtdView =
+  | 'inbox'
+  | 'next'
+  | 'today'
+  | 'next10days'
+  | 'waiting'
+  | 'projects'
+  | 'someday'
+  | 'reference'
+  | 'review';
+
+const VIEW_SORREND: GtdView[] = [
+  'inbox',
+  'next',
+  'today',
+  'next10days',
+  'waiting',
+  'projects',
+  'someday',
+  'reference',
+  'review',
+];
 
 export default function TaskDashboardLayout({ children, currentView }: TaskDashboardLayoutProps) {
   const { user, logout } = useAuth();
@@ -22,33 +45,45 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
   const [projectName, setProjectName] = useState('');
   const [projectColor, setProjectColor] = useState('#3b82f6');
 
-  const projectsQuery = trpc.projects.list.useQuery();
+  const projectsQuery = trpc.projects.overview.useQuery();
+  const gyujtoQuery = trpc.gyujto.list.useQuery();
+  const utils = trpc.useUtils();
   const createProjectMutation = trpc.projects.create.useMutation({
     onSuccess: () => {
       setProjectName('');
       setProjectColor('#3b82f6');
       setIsCreateProjectOpen(false);
-      projectsQuery.refetch();
-      toast.success('Project created successfully!');
+      utils.projects.invalidate();
+      toast.success('Projekt létrehozva');
     },
     onError: (error) => {
-      toast.error(`Error creating project: ${error.message}`);
+      toast.error(`Hiba: ${error.message}`);
     },
   });
 
   const handleCreateProject = () => {
     if (!projectName.trim()) {
-      toast.error('Please enter a project name');
+      toast.error('Add meg a projekt nevét');
       return;
     }
     createProjectMutation.mutate({ name: projectName, color: projectColor });
   };
 
-  const viewConfig = {
-    inbox: { icon: Inbox, label: 'Inbox', description: 'Unscheduled tasks' },
-    today: { icon: Calendar, label: 'Mai feladatok', description: 'Today\'s tasks' },
-    next10days: { icon: Clock, label: 'Következő 10 nap', description: 'Next 10 days' },
-    someday: { icon: Star, label: 'Valamikor talán', description: 'Someday/Maybe' },
+  const viewConfig: Record<GtdView, { icon: typeof Inbox; label: string; description: string; path: string }> = {
+    inbox: { icon: Inbox, label: 'Gyűjtő', description: 'Rögzíts mindent, az AI segít feldolgozni', path: '/inbox' },
+    next: { icon: ListChecks, label: 'Következő lépések', description: 'Kontextus szerint – mit csináljak most?', path: '/next' },
+    today: { icon: Calendar, label: 'Mai feladatok', description: 'Mai és lejárt határidők', path: '/today' },
+    next10days: { icon: Clock, label: 'Következő 10 nap', description: 'Közelgő határidők', path: '/next10days' },
+    waiting: { icon: Hourglass, label: 'Várakozás', description: 'Delegált tételek, amikre választ vársz', path: '/waiting' },
+    projects: { icon: FolderKanban, label: 'Projektek', description: 'Többlépéses célok és következő lépéseik', path: '/projects' },
+    someday: { icon: Star, label: 'Valamikor talán', description: 'Ötletek, amikkel később foglalkozhatsz', path: '/someday' },
+    reference: { icon: BookOpen, label: 'Referencia', description: 'Megőrzendő információk', path: '/reference' },
+    review: { icon: RefreshCw, label: 'Heti áttekintés', description: 'Kiürülés, naprakésszé tétel, kreativitás', path: '/review' },
+  };
+  const elakadtDb = projectsQuery.data?.filter(p => p.elakadt).length ?? 0;
+  const jelveny: Partial<Record<GtdView, number>> = {
+    inbox: gyujtoQuery.data?.length ?? 0,
+    projects: elakadtDb,
   };
 
   const CurrentViewIcon = viewConfig[currentView].icon;
@@ -61,21 +96,21 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
           {/* Header */}
           <div className="p-6 border-b border-border">
             <h1 className="text-2xl font-bold text-foreground">JustDoo</h1>
-            <p className="text-sm text-muted-foreground mt-1">Task Manager</p>
+            <p className="text-sm text-muted-foreground mt-1">GTD + AI asszisztens</p>
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-4 space-y-2">
             <div className="mb-6">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Views</p>
-              {(['inbox', 'today', 'next10days', 'someday'] as const).map((view) => {
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Nézetek</p>
+              {VIEW_SORREND.map((view) => {
                 const config = viewConfig[view];
                 const Icon = config.icon;
                 const isActive = currentView === view;
                 return (
                   <button
                     key={view}
-                    onClick={() => setLocation(`/${view}`)}
+                    onClick={() => setLocation(config.path)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-smooth ${
                       isActive
                         ? 'bg-accent text-accent-foreground font-medium'
@@ -83,7 +118,17 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
                     }`}
                   >
                     <Icon className="w-5 h-5" />
-                    <span>{config.label}</span>
+                    <span className="flex-1 text-left">{config.label}</span>
+                    {!!jelveny[view] && (
+                      <span
+                        className={`text-xs rounded-full px-2 py-0.5 ${
+                          view === 'projects' ? 'bg-amber-100 text-amber-800' : 'bg-primary text-primary-foreground'
+                        }`}
+                        title={view === 'projects' ? 'Elakadt projektek' : 'Feldolgozatlan elemek'}
+                      >
+                        {jelveny[view]}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -92,7 +137,7 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
             {/* Projects */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Projects</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Projektek</p>
                 <Dialog open={isCreateProjectOpen} onOpenChange={setIsCreateProjectOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
@@ -101,20 +146,20 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Create New Project</DialogTitle>
+                      <DialogTitle>Új projekt</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="project-name">Project Name</Label>
+                        <Label htmlFor="project-name">Projekt neve</Label>
                         <Input
                           id="project-name"
                           value={projectName}
                           onChange={(e) => setProjectName(e.target.value)}
-                          placeholder="Enter project name"
+                          placeholder="pl. Konyhafelújítás"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="project-color">Color</Label>
+                        <Label htmlFor="project-color">Szín</Label>
                         <div className="flex gap-2 items-center">
                           <input
                             id="project-color"
@@ -131,7 +176,7 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
                         disabled={createProjectMutation.isPending}
                         className="w-full"
                       >
-                        {createProjectMutation.isPending ? 'Creating...' : 'Create Project'}
+                        {createProjectMutation.isPending ? 'Létrehozás...' : 'Létrehozás'}
                       </Button>
                     </div>
                   </DialogContent>
@@ -139,9 +184,11 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
               </div>
 
               <div className="space-y-2">
-                {projectsQuery.data?.map((project) => (
+                {projectsQuery.data?.filter((p) => p.allapot === 'aktiv').map((project) => (
                   <div
                     key={project.id}
+                    onClick={() => setLocation(`/projects#projekt-${project.id}`)}
+                    title={project.elakadt ? 'Nincs következő lépés' : undefined}
                     className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm hover:bg-muted transition-smooth cursor-pointer group"
                   >
                     <div
@@ -149,6 +196,7 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
                       style={{ backgroundColor: project.color }}
                     />
                     <span className="text-foreground truncate flex-1">{project.name}</span>
+                    {project.elakadt && <span className="text-amber-600 text-xs">!</span>}
                   </div>
                 ))}
               </div>
@@ -158,7 +206,7 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
           {/* User Footer */}
           <div className="p-4 border-t border-border space-y-3">
             <div className="px-3 py-2 bg-muted rounded-lg">
-              <p className="text-xs font-semibold text-muted-foreground">Logged in as</p>
+              <p className="text-xs font-semibold text-muted-foreground">Bejelentkezve</p>
               <p className="text-sm font-medium text-foreground truncate">{user?.name || user?.email}</p>
             </div>
             <Button
@@ -171,7 +219,7 @@ export default function TaskDashboardLayout({ children, currentView }: TaskDashb
               size="sm"
             >
               <LogOut className="w-4 h-4 mr-2" />
-              Logout
+              Kijelentkezés
             </Button>
           </div>
         </div>
